@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
   try {
-    const { question } = await req.json()
+    const { question, history } = await req.json()
 
     if (!question) {
       return NextResponse.json(
@@ -11,18 +11,29 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const prompt = `You are a helpful study buddy AI. Answer the following question in a clear, educational way. Provide explanations, examples, and encourage learning. Be friendly and supportive.
+    // Build conversation context
+    const historyText = (history || [])
+      .map((chat: { question: string; answer: string }) => 
+        `User: ${chat.question}\nAssistant: ${chat.answer}`
+      )
+      .join("\n\n")
 
-Question: ${question}`
+    const prompt = `
+You are a helpful study buddy AI. Answer the user's questions clearly, step by step. 
+Stay consistent with the conversation context. Encourage learning and provide examples.
+
+Conversation so far:
+${historyText}
+
+New Question: ${question}
+    `
 
     const response = await fetch('http://localhost:11434/api/generate', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gemma3:latest',
-        prompt: prompt,
+        model: 'gemma3:1b',
+        prompt,
         stream: false,
       }),
     })
@@ -32,9 +43,9 @@ Question: ${question}`
     }
 
     const data = await response.json()
-    
-    return NextResponse.json({ 
-      answer: data.response || 'I could not process your question. Please try again!' 
+
+    return NextResponse.json({
+      answer: data.response || 'I could not process your question. Please try again!',
     })
   } catch (error) {
     console.error('Study Buddy API error:', error)
@@ -43,4 +54,4 @@ Question: ${question}`
       { status: 500 }
     )
   }
-} 
+}
